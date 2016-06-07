@@ -56,7 +56,7 @@ The coreos-baremetal repository contains a reference implementation using bootku
 * [hack/multi-node](hack/multi-node/README.md)
 * [coreos-baremetal](https://github.com/coreos/coreos-baremetal/blob/master/Documentation/bootkube.md)
 
-## Build
+## Building
 
 First, clone the repo into the proper location in your $GOPATH:
 
@@ -75,6 +75,14 @@ And optionally, to install into $GOPATH/bin:
 
 ```
 make install
+```
+
+## Building checkpoint image
+
+From the project root, run:
+
+```
+docker build -t $(REPO):$(VERSION_TAG) -f cmd/checkpoint/Dockerfile .
 ```
 
 ## Conformance Tests

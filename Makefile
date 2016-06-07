@@ -7,7 +7,7 @@ GOFILES:=$(shell find . -name '*.go' | grep -v -E '(./vendor|internal/templates.
 TEMPLATES:=$(shell find pkg/asset/templates -type f)
 GOPATH_BIN:=$(shell echo ${GOPATH} | awk 'BEGIN { FS = ":" }; { print $1 }')/bin
 
-all: _output/bin/linux/bootkube _output/bin/darwin/bootkube
+all: _output/bin/linux/bootkube _output/bin/darwin/bootkube _output/linux/checkpoint _output/darwin/checkpoint
 
 release: clean check _output/release/bootkube-linux-amd64.tar.gz _output/release/bootkube-darwin-amd64.tar.gz
 
@@ -27,6 +27,10 @@ _output/release/bootkube-%-amd64.tar.gz: _output/bin/%/bootkube
 
 install: _output/bin/$(LOCAL_OS)/bootkube
 	cp $< $(GOPATH_BIN)
+
+_output/bin/%/checkpoint: cmd/checkpoint/main.go
+	mkdir -p $(dir $@)
+	CGO_ENABLED=0 GOOS=$* go build -o _output/bin/$*/checkpoint github.com/coreos/bootkube/cmd/checkpoint
 
 pkg/asset/internal/templates.go: $(GOFILES) $(TEMPLATES)
 	mkdir -p $(dir $@)

@@ -32,6 +32,7 @@ coreos:
           --kubeconfig=/etc/kubernetes/kubeconfig \
           --lock-file=/var/run/lock/kubelet.lock \
           --exit-on-lock-contention \
+          --config=/etc/kubernetes/manifests \
           --allow-privileged \
           --hostname-override=${COREOS_PUBLIC_IPV4} \
           --node-labels=master=true \

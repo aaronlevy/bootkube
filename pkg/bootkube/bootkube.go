@@ -1,6 +1,7 @@
 package bootkube
 
 import (
+	"io/ioutil"
 	"net/url"
 	"path/filepath"
 	"time"
@@ -27,6 +28,10 @@ const (
 	// and doesn't end up in a race with bootkube for the insecure port. When bootkube dies, the self-hosted
 	// api-server is using the correct standard ports (443/8080).
 	insecureAPIAddr = "http://127.0.0.1:8081"
+	// The path that the "user space" checkpointing pod will be saved to.
+	// It is assumed that the kubelets running have been configured to
+	// read static manifests from this path.
+	checkpointPodPath = "/etc/kubernetes/manifests/checkpoint.json"
 )
 
 var requiredPods = []string{
@@ -106,5 +111,46 @@ func (b *bootkube) Run() error {
 	go func() { errch <- WaitUntilPodsRunning(requiredPods, assetTimeout) }()
 
 	// If any of the bootkube services exit, it means it is unrecoverable and we should exit.
-	return <-errch
+	err := <-errch
+	if err != nil {
+		return err
+	}
+
+	// Now that bootkube has finished without an error,
+	// move our "user space" checkpointing pod into place.
+	return ioutil.WriteFile(checkpointPodPath, checkpointPod, 0644)
 }
+
+var checkpointPod = []byte(`
+{
+        "kind": "Pod",
+        "spec": {
+                "restartPolicy": "Always",
+                "containers": [
+                        {
+                                "image": "quay.io/derek_parker/checkpoint:v1.0.0",
+                                "name": "checkpoint",
+                                "imagePullPolicy": "Always",
+                                "volumeMounts": [
+                                        {
+                                                "name": "etc-kubernetes",
+                                                "mountPath": "/etc/kubernetes"
+                                        }
+                                ]
+                        }
+                ],
+                "hostNetwork": true,
+                "volumes": [
+                        {
+                                "name": "etc-kubernetes",
+                                "hostPath": { "path": "/etc/kubernetes" }
+                        }
+                ]
+        },
+        "apiVersion": "v1",
+        "metadata": {
+                "namespace": "kube-system",
+                "name": "checkpoint"
+        }
+}
+`)

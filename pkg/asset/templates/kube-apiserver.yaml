@@ -30,33 +30,26 @@ spec:
         - --allow-privileged=true
         - --service-cluster-ip-range=10.3.0.0/24
         - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
-        - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
-        - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
-        - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
-        - --client-ca-file=/etc/kubernetes/secrets/ca.crt
+        - --tls-cert-file=/etc/kubernetes/tls/apiserver.crt
+        - --tls-private-key-file=/etc/kubernetes/tls/apiserver.key
+        - --service-account-key-file=/etc/kubernetes/tls/service-account.pub
+        - --client-ca-file=/etc/kubernetes/tls/ca.crt
         env:
           - name: MY_POD_IP
             valueFrom:
               fieldRef:
                 fieldPath: status.podIP
-        ports:
-        - containerPort: 443
-          hostPort: 443
-          name: https
-        - containerPort: 8080
-          hostPort: 8080
-          name: local
         volumeMounts:
         - mountPath: /etc/ssl/certs
           name: ssl-certs-host
           readOnly: true
-        - mountPath: /etc/kubernetes/secrets
-          name: secrets
+        - mountPath: /etc/kubernetes/tls
+          name: tls
           readOnly: true
       volumes:
       - name: ssl-certs-host
         hostPath:
           path: /usr/share/ca-certificates
-      - name: secrets
-        secret:
-          secretName: kube-apiserver
+      - name: tls
+        hostPath:
+          path: /home/core/cluster/tls

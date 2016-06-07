@@ -34,6 +34,7 @@ coreos:
           --lock-file=/var/run/lock/kubelet.lock \
           --exit-on-lock-contention=true \
           --allow-privileged \
+          --config=/etc/kubernetes/manifests \
           --hostname-override=${COREOS_PUBLIC_IPV4} \
           --node-labels=master=true \
           --minimum-container-ttl-duration=3m0s \

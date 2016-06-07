@@ -5,17 +5,19 @@ metadata:
   namespace: kube-system
   labels:
     k8s-app: kubelet
-    version: v1.3.0-alpha.5
+    version: v1.2.4_inotify.3
 spec:
   template:
     metadata:
       labels:
         k8s-app: kubelet
-        version: v1.3.0-alpha.5
+        version: v1.2.4_inotify.3
     spec:
+      nodeSelector:
+        master: "true"
       containers:
       - name: kubelet
-        image: quay.io/coreos/hyperkube:v1.3.0-alpha.5_coreos.0
+        image: quay.io/peanutbutter/hyperkube:v1.2.4_inotify.3
         command:
         - /nsenter
         - --target=1
@@ -32,7 +34,9 @@ spec:
         - --cluster-domain=cluster.local
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --lock-file=/var/run/lock/kubelet.lock
+        - --node-labels=master=true
         - --minimum-container-ttl-duration=3m0s
+        - --v=10
         env:
           - name: MY_POD_IP
             valueFrom:
