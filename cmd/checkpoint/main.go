@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -25,15 +26,19 @@ var manifestBytes = []byte(`
 }
 `)
 
+const (
+	kubeletAPIPodsURL = "http://localhost:10255/pods"
+	ignorePath        = "/srv/kubernetes/manifests"
+	activePath        = "/etc/kubernetes/manifests"
+	manifestFilename  = "apiserver.json"
+)
+
 var (
 	tempAPIServer = []byte("temp-apiserver")
 	kubeAPIServer = []byte("kube-apiserver")
-)
-
-const (
-	kubeletAPIPodsURL = "http://localhost:10255/pods"
-	ignorePath        = "/srv/kubernetes/manifests/apiserver.json"
-	activePath        = "/etc/kubernetes/manifests/apiserver.json"
+	activeFile    = filepath.Join(activePath, manifestFilename)
+	ignoreFile    = filepath.Join(ignorePath, manifestFilename)
+	ignoreTmpFile = filepath.Join(ignorePath, ".tmp-apiserver.json")
 )
 
 func main() {
@@ -42,19 +47,19 @@ func main() {
 }
 
 func run() {
-	var manifest v1.Pod
-	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+	var tempAPIServerManifest v1.Pod
+	if err := json.Unmarshal(manifestBytes, &tempAPIServerManifest); err != nil {
 		log.Fatal(err)
 	}
 	for {
-		rawPods := getPods()
+		rawPods := getPodsFromKubeletAPI()
 		switch {
 		case bothAPIServersRunning(rawPods):
 			log.Println("both temp and kube apiserver running, removing temp apiserver")
 			// Both the self-hosted API Server and the temp API Server are running.
 			// Remove the temp API Server manifest from the config dir so that the
 			// kubelet will stop it.
-			if err := os.Remove(activePath); err != nil {
+			if err := os.Remove(activeFile); err != nil {
 				log.Println(err)
 			}
 		case kubeSystemAPIServerRunning(rawPods):
@@ -62,37 +67,18 @@ func run() {
 			// The self-hosted API Server is running. Let's snapshot the pod,
 			// clean it up a bit, and then save it to the ignore path for
 			// later use.
-			var podList v1.PodList
-			var apiPod v1.Pod
-			if err := json.Unmarshal(rawPods, &podList); err != nil {
-				log.Fatal(err)
-			}
-			for _, p := range podList.Items {
-				if strings.Contains(p.Name, string(kubeAPIServer)) {
-					apiPod = p
-					break
-				}
-			}
-			cleanVolumes(&apiPod)
-			modifyInsecurePort(&apiPod)
-			manifest.Spec = apiPod.Spec
-			m, err := json.Marshal(manifest)
-			if err != nil {
-				log.Fatal(err)
-			}
-			if err := ioutil.WriteFile(ignorePath, m, 0644); err != nil {
-				log.Fatal(err)
-			}
-			log.Printf("finished creating temp-apiserver manifest at %s\n", ignorePath)
+			tempAPIServerManifest.Spec = parseAPIPodSpec(rawPods)
+			writeManifest(tempAPIServerManifest)
+			log.Printf("finished creating temp-apiserver manifest at %s\n", ignoreFile)
 
 		default:
 			log.Println("no apiserver running, installing temp apiserver static manifest")
-			b, err := ioutil.ReadFile(ignorePath)
+			b, err := ioutil.ReadFile(ignoreFile)
 			if err != nil {
 				log.Println(err)
 				continue
 			}
-			if err := ioutil.WriteFile(activePath, b, 0644); err != nil {
+			if err := ioutil.WriteFile(activeFile, b, 0644); err != nil {
 				log.Println(err)
 			}
 		}
@@ -100,7 +86,7 @@ func run() {
 	}
 }
 
-func getPods() []byte {
+func getPodsFromKubeletAPI() []byte {
 	var pods []byte
 	res, err := http.Get(kubeletAPIPodsURL)
 	if err != nil {
@@ -150,4 +136,37 @@ func modifyInsecurePort(p *v1.Pod) {
 			break
 		}
 	}
+}
+
+// writeManifest will write the manifest to the ignore path.
+// It first writes the file to a temp file, and then atomically moves it into
+// the actual ignore path and correct file name.
+func writeManifest(manifest v1.Pod) {
+	m, err := json.Marshal(manifest)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := ioutil.WriteFile(ignoreTmpFile, m, 0644); err != nil {
+		log.Fatal(err)
+	}
+	if err := os.Rename(ignoreTmpFile, ignoreFile); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func parseAPIPodSpec(rawPods []byte) v1.PodSpec {
+	var apiPod v1.Pod
+	var podList v1.PodList
+	if err := json.Unmarshal(rawPods, &podList); err != nil {
+		log.Fatal(err)
+	}
+	for _, p := range podList.Items {
+		if strings.Contains(p.Name, string(kubeAPIServer)) {
+			apiPod = p
+			break
+		}
+	}
+	cleanVolumes(&apiPod)
+	modifyInsecurePort(&apiPod)
+	return apiPod.Spec
 }
