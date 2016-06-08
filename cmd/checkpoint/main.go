@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"log"
@@ -11,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
 )
 
@@ -52,9 +52,12 @@ func run() {
 		log.Fatal(err)
 	}
 	for {
-		rawPods := getPodsFromKubeletAPI()
+		var podList v1.PodList
+		if err := json.Unmarshal(getPodsFromKubeletAPI(), &podList); err != nil {
+			log.Fatal(err)
+		}
 		switch {
-		case bothAPIServersRunning(rawPods):
+		case bothAPIServersRunning(podList):
 			log.Println("both temp and kube apiserver running, removing temp apiserver")
 			// Both the self-hosted API Server and the temp API Server are running.
 			// Remove the temp API Server manifest from the config dir so that the
@@ -62,12 +65,12 @@ func run() {
 			if err := os.Remove(activeFile); err != nil {
 				log.Println(err)
 			}
-		case kubeSystemAPIServerRunning(rawPods):
+		case kubeSystemAPIServerRunning(podList):
 			log.Println("kube-apiserver found, creating temp-apiserver manifest")
 			// The self-hosted API Server is running. Let's snapshot the pod,
 			// clean it up a bit, and then save it to the ignore path for
 			// later use.
-			tempAPIServerManifest.Spec = parseAPIPodSpec(rawPods)
+			tempAPIServerManifest.Spec = parseAPIPodSpec(podList)
 			writeManifest(tempAPIServerManifest)
 			log.Printf("finished creating temp-apiserver manifest at %s\n", ignoreFile)
 
@@ -76,10 +79,10 @@ func run() {
 			b, err := ioutil.ReadFile(ignoreFile)
 			if err != nil {
 				log.Println(err)
-				continue
-			}
-			if err := ioutil.WriteFile(activeFile, b, 0644); err != nil {
-				log.Println(err)
+			} else {
+				if err := ioutil.WriteFile(activeFile, b, 0644); err != nil {
+					log.Println(err)
+				}
 			}
 		}
 		time.Sleep(60 * time.Second)
@@ -101,12 +104,37 @@ func getPodsFromKubeletAPI() []byte {
 	return pods
 }
 
-func bothAPIServersRunning(pods []byte) bool {
-	return bytes.Contains(pods, tempAPIServer) && bytes.Contains(pods, kubeAPIServer)
+func bothAPIServersRunning(pods v1.PodList) bool {
+	var kubeAPISeen, tempAPISeen bool
+	for _, p := range pods.Items {
+		switch {
+		case isKubeAPI(p):
+			kubeAPISeen = true
+		case isTempAPI(p):
+			tempAPISeen = true
+		}
+		if kubeAPISeen && tempAPISeen {
+			return true
+		}
+	}
+	return false
 }
 
-func kubeSystemAPIServerRunning(pods []byte) bool {
-	return bytes.Contains(pods, kubeAPIServer)
+func kubeSystemAPIServerRunning(pods v1.PodList) bool {
+	for _, p := range pods.Items {
+		if isKubeAPI(p) {
+			return true
+		}
+	}
+	return false
+}
+
+func isKubeAPI(pod v1.Pod) bool {
+	return strings.Contains(pod.Name, "kube-apiserver") && pod.Namespace == api.NamespaceSystem
+}
+
+func isTempAPI(pod v1.Pod) bool {
+	return strings.Contains(pod.Name, "temp-apiserver") && pod.Namespace == api.NamespaceSystem
 }
 
 // cleanVolumes will sanitize the list of volumes and volume mounts
@@ -154,12 +182,8 @@ func writeManifest(manifest v1.Pod) {
 	}
 }
 
-func parseAPIPodSpec(rawPods []byte) v1.PodSpec {
+func parseAPIPodSpec(podList v1.PodList) v1.PodSpec {
 	var apiPod v1.Pod
-	var podList v1.PodList
-	if err := json.Unmarshal(rawPods, &podList); err != nil {
-		log.Fatal(err)
-	}
 	for _, p := range podList.Items {
 		if strings.Contains(p.Name, string(kubeAPIServer)) {
 			apiPod = p
