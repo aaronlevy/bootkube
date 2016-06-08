@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -33,16 +32,12 @@ var (
 
 const (
 	kubeletAPIPodsURL = "http://localhost:10255/pods"
-	ignorePath        = "/etc/kubernetes/_manifests/apiserver.json"
+	ignorePath        = "/srv/kubernetes/manifests/apiserver.json"
 	activePath        = "/etc/kubernetes/manifests/apiserver.json"
 )
 
 func main() {
 	log.Println("begin apiserver checkpointing...")
-	// Create ignore dir.
-	if err := os.MkdirAll(filepath.Dir(ignorePath), 0755); err != nil {
-		log.Fatal(err)
-	}
 	run()
 }
 
@@ -88,6 +83,7 @@ func run() {
 			if err := ioutil.WriteFile(ignorePath, m, 0644); err != nil {
 				log.Fatal(err)
 			}
+			log.Printf("finished creating temp-apiserver manifest at %s\n", ignorePath)
 
 		default:
 			log.Println("no apiserver running, installing temp apiserver static manifest")
@@ -100,7 +96,7 @@ func run() {
 				log.Println(err)
 			}
 		}
-		time.Sleep(time.Second)
+		time.Sleep(60 * time.Second)
 	}
 }
 

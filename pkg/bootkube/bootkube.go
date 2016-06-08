@@ -135,6 +135,10 @@ var checkpointPod = []byte(`
                                         {
                                                 "name": "etc-kubernetes",
                                                 "mountPath": "/etc/kubernetes"
+                                        },
+                                        {
+                                                "name": "srv-kubernetes",
+                                                "mountPath": "/srv/kubernetes"
                                         }
                                 ]
                         }
@@ -144,6 +148,10 @@ var checkpointPod = []byte(`
                         {
                                 "name": "etc-kubernetes",
                                 "hostPath": { "path": "/etc/kubernetes" }
+                        },
+                        {
+                                "name": "srv-kubernetes",
+                                "hostPath": { "path": "/srv/kubernetes" }
                         }
                 ]
         },
