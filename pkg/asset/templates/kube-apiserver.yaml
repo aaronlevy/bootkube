@@ -18,7 +18,7 @@ spec:
       hostNetwork: true
       containers:
       - name: kube-apiserver
-        image: quay.io/coreos/hyperkube:v1.3.0-alpha.5_coreos.0
+        image: quay.io/peanutbutter/hyperkube:v1.3.0-alpha.5_derek.1
         command:
         - /hyperkube
         - apiserver
@@ -30,10 +30,10 @@ spec:
         - --allow-privileged=true
         - --service-cluster-ip-range=10.3.0.0/24
         - --admission-control=NamespaceLifecycle,LimitRanger,ServiceAccount,ResourceQuota
-        - --tls-cert-file=/etc/kubernetes/tls/apiserver.crt
-        - --tls-private-key-file=/etc/kubernetes/tls/apiserver.key
-        - --service-account-key-file=/etc/kubernetes/tls/service-account.pub
-        - --client-ca-file=/etc/kubernetes/tls/ca.crt
+        - --tls-cert-file=/etc/kubernetes/secrets/apiserver.crt
+        - --tls-private-key-file=/etc/kubernetes/secrets/apiserver.key
+        - --service-account-key-file=/etc/kubernetes/secrets/service-account.pub
+        - --client-ca-file=/etc/kubernetes/secrets/ca.crt
         env:
           - name: MY_POD_IP
             valueFrom:
@@ -43,13 +43,13 @@ spec:
         - mountPath: /etc/ssl/certs
           name: ssl-certs-host
           readOnly: true
-        - mountPath: /etc/kubernetes/tls
-          name: tls
+        - mountPath: /etc/kubernetes/secrets
+          name: secrets
           readOnly: true
       volumes:
       - name: ssl-certs-host
         hostPath:
           path: /usr/share/ca-certificates
-      - name: tls
-        hostPath:
-          path: /home/core/cluster/tls
+      - name: secrets
+        secret:
+          secretName: kube-apiserver

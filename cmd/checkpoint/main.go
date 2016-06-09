@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -12,6 +13,9 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
+	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
+	"k8s.io/kubernetes/pkg/client/restclient"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
 
 var manifestBytes = []byte(`
@@ -31,6 +35,8 @@ const (
 	ignorePath        = "/srv/kubernetes/manifests"
 	activePath        = "/etc/kubernetes/manifests"
 	manifestFilename  = "apiserver.json"
+	kubeconfigPath    = "/etc/kubernetes/kubeconfig"
+	tlsPath           = "/etc/kubernetes/tls"
 )
 
 var (
@@ -38,7 +44,7 @@ var (
 	kubeAPIServer = []byte("kube-apiserver")
 	activeFile    = filepath.Join(activePath, manifestFilename)
 	ignoreFile    = filepath.Join(ignorePath, manifestFilename)
-	ignoreTmpFile = filepath.Join(ignorePath, ".tmp-apiserver.json")
+	secureAPIAddr = fmt.Sprintf("https://%s:%s", os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT_HTTPS"))
 )
 
 func main() {
@@ -51,6 +57,7 @@ func run() {
 	if err := json.Unmarshal(manifestBytes, &tempAPIServerManifest); err != nil {
 		log.Fatal(err)
 	}
+	client := newAPIClient()
 	for {
 		var podList v1.PodList
 		if err := json.Unmarshal(getPodsFromKubeletAPI(), &podList); err != nil {
@@ -71,6 +78,7 @@ func run() {
 			// clean it up a bit, and then save it to the ignore path for
 			// later use.
 			tempAPIServerManifest.Spec = parseAPIPodSpec(podList)
+			convertSecretsToVolumeMounts(client, &tempAPIServerManifest.Spec)
 			writeManifest(tempAPIServerManifest)
 			log.Printf("finished creating temp-apiserver manifest at %s\n", ignoreFile)
 
@@ -174,12 +182,7 @@ func writeManifest(manifest v1.Pod) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := ioutil.WriteFile(ignoreTmpFile, m, 0644); err != nil {
-		log.Fatal(err)
-	}
-	if err := os.Rename(ignoreTmpFile, ignoreFile); err != nil {
-		log.Fatal(err)
-	}
+	writeAndAtomicCopy(m, ignoreFile)
 }
 
 func parseAPIPodSpec(podList v1.PodList) v1.PodSpec {
@@ -193,4 +196,67 @@ func parseAPIPodSpec(podList v1.PodList) v1.PodSpec {
 	cleanVolumes(&apiPod)
 	modifyInsecurePort(&apiPod)
 	return apiPod.Spec
+}
+
+func newAPIClient() clientset.Interface {
+	kubeConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(&clientcmd.ClientConfigLoadingRules{
+		ExplicitPath: kubeconfigPath},
+		&clientcmd.ConfigOverrides{}).ClientConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	client, err := clientset.NewForConfig(&restclient.Config{
+		Host: secureAPIAddr,
+		TLSClientConfig: restclient.TLSClientConfig{
+			CertData: kubeConfig.CertData,
+			KeyData:  kubeConfig.KeyData,
+			CAData:   kubeConfig.CAData,
+		},
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	return client
+}
+
+func convertSecretsToVolumeMounts(client clientset.Interface, spec *v1.PodSpec) {
+	log.Println("converting secrets to volume mounts")
+	for i := range spec.Volumes {
+		v := &spec.Volumes[i]
+		if v.Name == "secrets" && v.Secret != nil {
+			v.HostPath = &v1.HostPathVolumeSource{
+				Path: tlsPath,
+			}
+			copySecretsToDisk(client, v.Secret.SecretName)
+			v.Secret = nil
+			break
+		}
+	}
+}
+
+func copySecretsToDisk(client clientset.Interface, name string) {
+	log.Println("copying secrets to disk")
+	if err := os.MkdirAll(tlsPath, 0755); err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("created directory %s", tlsPath)
+	s, err := client.Core().Secrets(api.NamespaceSystem).Get(name)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for name, value := range s.Data {
+		writeAndAtomicCopy(value, filepath.Join(tlsPath, name))
+	}
+}
+
+func writeAndAtomicCopy(data []byte, path string) {
+	// First write a "temp" file.
+	tmpfile := filepath.Join(filepath.Dir(path), "."+filepath.Base(path))
+	if err := ioutil.WriteFile(tmpfile, data, 0644); err != nil {
+		log.Fatal(err)
+	}
+	// Finally, copy that file to the correct location.
+	if err := os.Rename(tmpfile, path); err != nil {
+		log.Fatal(err)
+	}
 }

@@ -26,8 +26,8 @@ coreos:
       content: |
         [Service]
         EnvironmentFile=/etc/environment
-        Environment=KUBELET_ACI=quay.io/coreos/hyperkube
-        Environment=KUBELET_VERSION=v1.3.0-alpha.5_coreos.0
+        Environment=KUBELET_ACI=quay.io/peanutbutter/hyperkube
+        Environment=KUBELET_VERSION=v1.3.0-alpha.5_derek.1
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /srv/kubernetes/manifests
         ExecStart=/usr/lib/coreos/kubelet-wrapper \
