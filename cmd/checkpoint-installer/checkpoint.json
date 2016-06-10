@@ -4,8 +4,9 @@
                 "restartPolicy": "Always",
                 "containers": [
                         {
-                                "image": "quay.io/derek_parker/checkpoint:v1.0.0",
+                                "image": "quay.io/derek_parker/bootkube:v0.1.0",
                                 "name": "checkpoint",
+                                "command": ["/checkpoint"],
                                 "imagePullPolicy": "Always",
                                 "volumeMounts": [
                                         {
