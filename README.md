@@ -77,6 +77,14 @@ And optionally, to install into $GOPATH/bin:
 make install
 ```
 
+## Building checkpoint installer image
+
+From the project root, run:
+
+```
+docker build -t $(REPO):$(VERSION_TAG) -f cmd/checkpoint-installer/Dockerfile cmd/checkpoint-installer
+```
+
 ## Building checkpoint image
 
 From the project root, run:

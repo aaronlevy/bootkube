@@ -17,6 +17,11 @@ spec:
         master: "true"
       hostNetwork: true
       containers:
+      - name: checkpoint-installer
+        image: quay.io/derek_parker/checkpoint-installer:v1.0.0
+        volumeMounts:
+        - mountPath: /etc/kubernetes/manifests
+          name: etc-k8s-manifests
       - name: kube-apiserver
         image: quay.io/peanutbutter/hyperkube:v1.3.0-alpha.5_derek.1
         command:
@@ -50,6 +55,9 @@ spec:
       - name: ssl-certs-host
         hostPath:
           path: /usr/share/ca-certificates
+      - name: etc-k8s-manifests
+        hostPath:
+          path: /etc/kubernetes/manifests
       - name: secrets
         secret:
           secretName: kube-apiserver

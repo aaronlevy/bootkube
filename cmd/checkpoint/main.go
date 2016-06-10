@@ -149,27 +149,33 @@ func isTempAPI(pod v1.Pod) bool {
 // to remove the default service account token.
 func cleanVolumes(p *v1.Pod) {
 	volumes := make([]v1.Volume, 0, len(p.Spec.Volumes))
-	volumeMounts := make([]v1.VolumeMount, 0, len(p.Spec.Volumes))
 	for _, v := range p.Spec.Volumes {
 		if !strings.Contains(v.Name, "default") {
 			volumes = append(volumes, v)
 		}
 	}
-	for _, vm := range p.Spec.Containers[0].VolumeMounts {
-		if !strings.Contains(vm.Name, "default") {
-			volumeMounts = append(volumeMounts, vm)
-		}
-	}
 	p.Spec.Volumes = volumes
-	p.Spec.Containers[0].VolumeMounts = volumeMounts
+	for i := range p.Spec.Containers {
+		c := &p.Spec.Containers[i]
+		volumeMounts := make([]v1.VolumeMount, 0, len(c.VolumeMounts))
+		for _, vm := range c.VolumeMounts {
+			if !strings.Contains(vm.Name, "default") {
+				volumeMounts = append(volumeMounts, vm)
+			}
+		}
+		c.VolumeMounts = volumeMounts
+	}
 }
 
 func modifyInsecurePort(p *v1.Pod) {
-	cmds := p.Spec.Containers[0].Command
-	for i, c := range cmds {
-		if strings.Contains(c, "insecure-port") {
-			cmds[i] = strings.Replace(c, "8080", "8081", 1)
-			break
+	for i := range p.Spec.Containers {
+		c := &p.Spec.Containers[i]
+		cmds := c.Command
+		for i, cmd := range cmds {
+			if strings.Contains(cmd, "insecure-port") {
+				cmds[i] = strings.Replace(cmd, "8080", "8081", 1)
+				break
+			}
 		}
 	}
 }
