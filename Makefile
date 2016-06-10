@@ -7,7 +7,7 @@ GOFILES:=$(shell find . -name '*.go' | grep -v -E '(./vendor|internal/templates.
 TEMPLATES:=$(shell find pkg/asset/templates -type f)
 GOPATH_BIN:=$(shell echo ${GOPATH} | awk 'BEGIN { FS = ":" }; { print $1 }')/bin
 
-all: _output/bin/linux/bootkube _output/bin/darwin/bootkube _output/bin/linux/checkpoint _output/bin/darwin/checkpoint
+all: _output/bin/linux/bootkube _output/bin/darwin/bootkube _output/bin/linux/checkpoint
 
 release: clean check _output/release/bootkube-linux-amd64.tar.gz _output/release/bootkube-darwin-amd64.tar.gz
 
