@@ -22,9 +22,9 @@ _output/bin/%/bootkube: $(GOFILES) pkg/asset/internal/templates.go
 	mkdir -p $(dir $@)
 	GOOS=$* go build -ldflags "$(LDFLAGS)" -o _output/bin/$*/bootkube github.com/coreos/bootkube/cmd/bootkube
 
-_output/release/bootkube-%-amd64.tar.gz: _output/bin/%/bootkube _output/bin/%/checkpoint _output/bin/%/install.sh
+_output/release/bootkube-%-amd64.tar.gz: _output/bin/%/bootkube _output/bin/%/checkpoint _output/bin/%/install.sh _output/bin/%/checkpoint.json
 	@mkdir -p $(dir $@)
-	tar czf $@ -C $(dir $<) bootkube checkpoint install.sh
+	tar czf $@ -C $(dir $<) bootkube checkpoint install.sh checkpoint.json
 
 install: _output/bin/$(LOCAL_OS)/bootkube
 	cp $< $(GOPATH_BIN)
@@ -35,7 +35,11 @@ _output/bin/%/checkpoint: cmd/checkpoint/main.go
 
 _output/bin/%/install.sh:
 	@mkdir -p $(dir $@)
-	@cp cmd/checkpoint-installer/install.sh $@
+	cp cmd/checkpoint-installer/install.sh $@
+
+_output/bin/%/checkpoint.json:
+	@mkdir -p $(dir $@)
+	cp cmd/checkpoint-installer/checkpoint.json $(dir $@)checkpoint.json
 
 pkg/asset/internal/templates.go: $(GOFILES) $(TEMPLATES)
 	mkdir -p $(dir $@)

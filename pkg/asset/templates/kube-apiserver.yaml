@@ -18,7 +18,7 @@ spec:
       hostNetwork: true
       containers:
       - name: checkpoint-installer
-        image: quay.io/derek_parker/bootkuber:v0.1.0
+        image: quay.io/derek_parker/bootkube:v0.1.0
         command:
         - /checkpoint-installer.sh
         volumeMounts:
