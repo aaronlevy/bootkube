@@ -27,10 +27,6 @@ const (
 	// and doesn't end up in a race with bootkube for the insecure port. When bootkube dies, the self-hosted
 	// api-server is using the correct standard ports (443/8080).
 	insecureAPIAddr = "http://127.0.0.1:8081"
-	// The path that the "user space" checkpointing pod will be saved to.
-	// It is assumed that the kubelets running have been configured to
-	// read static manifests from this path.
-	checkpointPodPath = "/etc/kubernetes/manifests/checkpoint.json"
 )
 
 var requiredPods = []string{

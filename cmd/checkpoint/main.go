@@ -15,8 +15,8 @@ import (
 	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
-	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
+	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
 )
 
 const (
@@ -29,11 +29,11 @@ const (
 )
 
 var (
-	tempAPIServer = []byte("temp-apiserver")
-	kubeAPIServer = []byte("kube-apiserver")
-	activeFile    = filepath.Join(activePath, manifestFilename)
-	ignoreFile    = filepath.Join(ignorePath, manifestFilename)
-	secureAPIAddr = fmt.Sprintf("https://%s:%s", os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT_HTTPS"))
+	tempAPIServer      = []byte("temp-apiserver")
+	kubeAPIServer      = []byte("kube-apiserver")
+	activeManifest     = filepath.Join(activePath, manifestFilename)
+	checkpointManifest = filepath.Join(ignorePath, manifestFilename)
+	secureAPIAddr      = fmt.Sprintf("https://%s:%s", os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT_HTTPS"))
 )
 
 var tempAPIServerManifest = v1.Pod{
@@ -65,7 +65,7 @@ func run() {
 			// Both the self-hosted API Server and the temp API Server are running.
 			// Remove the temp API Server manifest from the config dir so that the
 			// kubelet will stop it.
-			if err := os.Remove(activeFile); err != nil {
+			if err := os.Remove(activeManifest); err != nil {
 				log.Println(err)
 			}
 		case kubeSystemAPIServerRunning(podList):
@@ -76,15 +76,15 @@ func run() {
 			tempAPIServerManifest.Spec = parseAPIPodSpec(podList)
 			convertSecretsToVolumeMounts(client, &tempAPIServerManifest.Spec)
 			writeManifest(tempAPIServerManifest)
-			log.Printf("finished creating temp-apiserver manifest at %s\n", ignoreFile)
+			log.Printf("finished creating temp-apiserver manifest at %s\n", checkpointManifest)
 
 		default:
 			log.Println("no apiserver running, installing temp apiserver static manifest")
-			b, err := ioutil.ReadFile(ignoreFile)
+			b, err := ioutil.ReadFile(checkpointManifest)
 			if err != nil {
 				log.Println(err)
 			} else {
-				if err := ioutil.WriteFile(activeFile, b, 0644); err != nil {
+				if err := ioutil.WriteFile(activeManifest, b, 0644); err != nil {
 					log.Println(err)
 				}
 			}
@@ -111,12 +111,8 @@ func getPodsFromKubeletAPI() []byte {
 func bothAPIServersRunning(pods v1.PodList) bool {
 	var kubeAPISeen, tempAPISeen bool
 	for _, p := range pods.Items {
-		switch {
-		case isKubeAPI(p):
-			kubeAPISeen = true
-		case isTempAPI(p):
-			tempAPISeen = true
-		}
+		kubeAPISeen = kubeAPISeen || isKubeAPI(p)
+		tempAPISeen = tempAPISeen || isTempAPI(p)
 		if kubeAPISeen && tempAPISeen {
 			return true
 		}
@@ -146,7 +142,7 @@ func isTempAPI(pod v1.Pod) bool {
 func cleanVolumes(p *v1.Pod) {
 	volumes := make([]v1.Volume, 0, len(p.Spec.Volumes))
 	for _, v := range p.Spec.Volumes {
-		if !strings.Contains(v.Name, "default") {
+		if !strings.HasPrefix(v.Name, "default-token") {
 			volumes = append(volumes, v)
 		}
 	}
@@ -155,7 +151,7 @@ func cleanVolumes(p *v1.Pod) {
 		c := &p.Spec.Containers[i]
 		volumeMounts := make([]v1.VolumeMount, 0, len(c.VolumeMounts))
 		for _, vm := range c.VolumeMounts {
-			if !strings.Contains(vm.Name, "default") {
+			if !strings.HasPrefix(vm.Name, "default-token") {
 				volumeMounts = append(volumeMounts, vm)
 			}
 		}
@@ -163,6 +159,9 @@ func cleanVolumes(p *v1.Pod) {
 	}
 }
 
+// We need to ensure that the temp apiserver is not binding
+// on the same insecure port as our self-hosted apiserver, otherwise
+// it will exit immediately instead of waiting to bind.
 func modifyInsecurePort(p *v1.Pod) {
 	for i := range p.Spec.Containers {
 		c := &p.Spec.Containers[i]
@@ -184,13 +183,13 @@ func writeManifest(manifest v1.Pod) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	writeAndAtomicCopy(m, ignoreFile)
+	writeAndAtomicCopy(m, checkpointManifest)
 }
 
 func parseAPIPodSpec(podList v1.PodList) v1.PodSpec {
 	var apiPod v1.Pod
 	for _, p := range podList.Items {
-		if strings.Contains(p.Name, string(kubeAPIServer)) {
+		if isKubeAPI(p) {
 			apiPod = p
 			break
 		}
@@ -203,29 +202,18 @@ func parseAPIPodSpec(podList v1.PodList) v1.PodSpec {
 func newAPIClient() clientset.Interface {
 	kubeConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
 		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
-		&clientcmd.ConfigOverrides{}).ClientConfig()
+		&clientcmd.ConfigOverrides{ClusterInfo: clientcmdapi.Cluster{Server: secureAPIAddr}}).ClientConfig()
 	if err != nil {
 		log.Fatal(err)
 	}
-	client, err := clientset.NewForConfig(&restclient.Config{
-		Host: secureAPIAddr,
-		TLSClientConfig: restclient.TLSClientConfig{
-			CertData: kubeConfig.CertData,
-			KeyData:  kubeConfig.KeyData,
-			CAData:   kubeConfig.CAData,
-		},
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	return client
+	return clientset.NewForConfigOrDie(kubeConfig)
 }
 
 func convertSecretsToVolumeMounts(client clientset.Interface, spec *v1.PodSpec) {
 	log.Println("converting secrets to volume mounts")
 	for i := range spec.Volumes {
 		v := &spec.Volumes[i]
-		if v.Name == "secrets" && v.Secret != nil {
+		if v.Secret != nil {
 			v.HostPath = &v1.HostPathVolumeSource{
 				Path: tlsPath,
 			}
