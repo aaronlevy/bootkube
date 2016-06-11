@@ -12,23 +12,12 @@ import (
 	"time"
 
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/unversioned"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_2"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 )
-
-var manifestBytes = []byte(`
-{
-"apiVersion": "v1",
-"kind": "Pod",
-"metadata": {
-  "name": "temp-apiserver",
-  "namespace": "kube-system"
-},
-"spec": {}
-}
-`)
 
 const (
 	kubeletAPIPodsURL = "http://localhost:10255/pods"
@@ -47,16 +36,23 @@ var (
 	secureAPIAddr = fmt.Sprintf("https://%s:%s", os.Getenv("KUBERNETES_SERVICE_HOST"), os.Getenv("KUBERNETES_SERVICE_PORT_HTTPS"))
 )
 
+var tempAPIServerManifest = v1.Pod{
+	TypeMeta: unversioned.TypeMeta{
+		APIVersion: "v1",
+		Kind:       "Pod",
+	},
+	ObjectMeta: v1.ObjectMeta{
+		Name:      "temp-apiserver",
+		Namespace: "kube-system",
+	},
+}
+
 func main() {
 	log.Println("begin apiserver checkpointing...")
 	run()
 }
 
 func run() {
-	var tempAPIServerManifest v1.Pod
-	if err := json.Unmarshal(manifestBytes, &tempAPIServerManifest); err != nil {
-		log.Fatal(err)
-	}
 	client := newAPIClient()
 	for {
 		var podList v1.PodList
