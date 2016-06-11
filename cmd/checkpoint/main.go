@@ -201,8 +201,8 @@ func parseAPIPodSpec(podList v1.PodList) v1.PodSpec {
 }
 
 func newAPIClient() clientset.Interface {
-	kubeConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(&clientcmd.ClientConfigLoadingRules{
-		ExplicitPath: kubeconfigPath},
+	kubeConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
+		&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath},
 		&clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
 		log.Fatal(err)
