@@ -25,6 +25,8 @@ func newStaticAssets() Assets {
 		mustCreateAssetFromTemplate(AssetPathKubeDNSRc, internal.DNSRcTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathKubeDNSSvc, internal.DNSSvcTemplate, noData),
 		mustCreateAssetFromTemplate(AssetPathSystemNamespace, internal.SystemNSTemplate, noData),
+		mustCreateAssetFromTemplate(AssetPathKubeFlannel, internal.KubeFlannelTemplate, noData),
+		mustCreateAssetFromTemplate(AssetPathKubeFlannelCm, internal.KubeFlannelCmTemplate, noData),
 	}
 }
 

@@ -21,6 +21,8 @@ spec:
         - controller-manager
         - --root-ca-file=/etc/kubernetes/secrets/ca.crt
         - --service-account-private-key-file=/etc/kubernetes/secrets/service-account.key
+        - --allocate-node-cidrs=true
+        - --cluster-cidr=10.2.0..0/16
         - --leader-elect=true
         volumeMounts:
         - name: secrets
