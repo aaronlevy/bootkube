@@ -1,6 +1,8 @@
 #cloud-config
 
 coreos:
+  flannel:
+    interface: $public_ipv4
   units:
     - name: kubelet.service
       command: start
