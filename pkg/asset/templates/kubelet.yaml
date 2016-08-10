@@ -35,6 +35,7 @@ spec:
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --lock-file=/var/run/lock/kubelet.lock
         - --minimum-container-ttl-duration=3m0s
+        - --v=4
         env:
           - name: MY_POD_IP
             valueFrom:

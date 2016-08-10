@@ -14,9 +14,12 @@ coreos:
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /srv/kubernetes/manifests
         ExecStartPre=/bin/mkdir -p /etc/kubernetes/checkpoint-secrets
+        ExecStartPre=/bin/mkdir -p /etc/kubernetes/cni/net.d
         ExecStart=/usr/lib/coreos/kubelet-wrapper \
           --api-servers=https://172.17.4.101:443 \
           --kubeconfig=/etc/kubernetes/kubeconfig \
+          --network-plugin-dir=/etc/kubernetes/cni/net.d \
+          --network-plugin=cni \
           --lock-file=/var/run/lock/kubelet.lock \
           --exit-on-lock-contention \
           --config=/etc/kubernetes/manifests \
@@ -25,7 +28,8 @@ coreos:
           --node-labels=master=true \
           --minimum-container-ttl-duration=3m0s \
           --cluster_dns=10.3.0.10 \
-          --cluster_domain=cluster.local
+          --cluster_domain=cluster.local \
+          --v=4
         Restart=always
         RestartSec=5
 
