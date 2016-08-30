@@ -19,6 +19,7 @@ contexts:
     cluster: local
     user: kubelet
 `)
+
 	KubeletTemplate = []byte(`apiVersion: extensions/v1beta1
 kind: DaemonSet
 metadata:
@@ -38,13 +39,10 @@ spec:
       - name: kubelet
         image: quay.io/coreos/hyperkube:v1.4.0-beta.8_coreos.0
         command:
-        - /nsenter
-        - --target=1
-        - --mount
-        - --wd=.
-        - --
         - ./hyperkube
         - kubelet
+        - --network-plugin=cni
+        - --cni-conf=/etc/kubernetes/cni/net.d
         - --pod-manifest-path=/etc/kubernetes/manifests
         - --allow-privileged
         - --hostname-override=$(MY_POD_IP)
@@ -53,6 +51,7 @@ spec:
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --require-kubeconfig
         - --lock-file=/var/run/lock/kubelet.lock
+        - --containerized
         env:
           - name: MY_POD_IP
             valueFrom:
@@ -80,6 +79,8 @@ spec:
           mountPath: /var/lib/kubelet
         - name: var-lib-rkt
           mountPath: /var/lib/rkt
+        - name: rootfs
+          mountPath: /rootfs
       hostNetwork: true
       hostPID: true
       volumes:
@@ -107,7 +108,11 @@ spec:
       - name: var-lib-rkt
         hostPath:
           path: /var/lib/rkt
+      - name: rootfs
+        hostPath:
+          path: /
 `)
+
 	APIServerTemplate = []byte(`apiVersion: "extensions/v1beta1"
 kind: DaemonSet
 metadata:
@@ -196,6 +201,9 @@ spec:
         command:
         - ./hyperkube
         - controller-manager
+        - --allocate-node-cidrs=true
+        - --configure-cloud-routes=false
+        - --cluster-cidr=10.2.0.0/16
         - --root-ca-file=/etc/kubernetes/secrets/ca.crt
         - --service-account-private-key-file=/etc/kubernetes/secrets/service-account.key
         - --leader-elect=true
@@ -261,6 +269,7 @@ spec:
         - proxy
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --proxy-mode=iptables
+        - --masquerade-all=true #NOTE(aaron): this is necessary for vagrant when eth0 IP is not routable
         securityContext:
           privileged: true
         volumeMounts:
@@ -398,5 +407,100 @@ spec:
   - name: dns-tcp
     port: 53
     protocol: TCP
+`)
+	KubeFlannelCfgTemplate = []byte(`apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kube-flannel-cfg
+  namespace: kube-system
+  labels:
+    tier: node
+    app: flannel
+data:
+  cni-conf.json: |
+    {
+      "name": "cbr0",
+      "type": "flannel",
+      "delegate": {
+        "isDefaultGateway": true
+      }
+    }
+  net-conf.json: |
+    {
+      "Network": "10.2.0.0/16",
+      "Backend": {
+        "Type": "vxlan"
+      }
+    }
+`)
+
+	KubeFlannelTemplate = []byte(`apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: kube-flannel
+  namespace: kube-system
+  labels:
+    tier: node
+    app: flannel
+spec:
+  template:
+    metadata:
+      labels:
+        tier: node
+        app: flannel
+    spec:
+      hostNetwork: true
+      containers:
+      - name: kube-flannel
+        image: gcr.io/mikedanese-k8s/flannel:v9
+        command: [ "/opt/bin/flanneld", "--ip-masq", "--kube-subnet-mgr", "--iface=$(POD_IP)"]
+        securityContext:
+          privileged: true
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        volumeMounts:
+        - name: run
+          mountPath: /run
+        - name: cni
+          mountPath: /etc/cni/net.d
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+      - name: install-cni
+        image: busybox
+        command: [ "/bin/sh", "-c", "set -e -x; TMP=/cni/net.d/.tmp-flannel-cfg; cp /etc/kube-flannel/cni-conf.json ${TMP}; mv ${TMP} /cni/net.d/10-flannel.conf; while :; do sleep 3600; done" ]
+        volumeMounts:
+        - name: cni
+          mountPath: /etc/cni/net.d
+        - name: flannel-cfg
+          mountPath: /etc/kube-flannel/
+      volumes:
+        - name: run
+          hostPath:
+            path: /run
+        - name: cni
+          hostPath:
+            path: /etc/kubernetes/cni/net.d
+        - name: flannel-cfg
+      volumes:
+        - name: run
+          hostPath:
+            path: /run
+        - name: cni
+          hostPath:
+            path: /etc/cni/net.d
+        - name: flannel-cfg
+          configMap:
+            name: kube-flannel-cfg
 `)
 )
