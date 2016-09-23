@@ -20,6 +20,7 @@ coreos:
           --kubeconfig=/etc/kubernetes/kubeconfig \
           --require-kubeconfig \
           --network-plugin-dir=/etc/kubernetes/cni/net.d \
+          --cni-conf-dir=/etc/kubernetes/cni/net.d \
           --network-plugin=cni \
           --lock-file=/var/run/lock/kubelet.lock \
           --exit-on-lock-contention=true \
