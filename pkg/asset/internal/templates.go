@@ -42,7 +42,7 @@ spec:
         - ./hyperkube
         - kubelet
         - --network-plugin=cni
-        - --cni-conf=/etc/kubernetes/cni/net.d
+        - --cni-conf-dir=/etc/kubernetes/cni/net.d
         - --pod-manifest-path=/etc/kubernetes/manifests
         - --allow-privileged
         - --hostname-override=$(MY_POD_IP)
@@ -491,14 +491,6 @@ spec:
         - name: cni
           hostPath:
             path: /etc/kubernetes/cni/net.d
-        - name: flannel-cfg
-      volumes:
-        - name: run
-          hostPath:
-            path: /run
-        - name: cni
-          hostPath:
-            path: /etc/cni/net.d
         - name: flannel-cfg
           configMap:
             name: kube-flannel-cfg
