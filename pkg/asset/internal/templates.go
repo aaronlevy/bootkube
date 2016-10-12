@@ -269,7 +269,7 @@ spec:
         - proxy
         - --kubeconfig=/etc/kubernetes/kubeconfig
         - --proxy-mode=iptables
-        - --masquerade-all=true #NOTE(aaron): this is necessary for vagrant when eth0 IP is not routable
+        - --cluster-cidr=10.2.0.0/16
         securityContext:
           privileged: true
         volumeMounts:
