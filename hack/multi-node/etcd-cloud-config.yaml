@@ -17,3 +17,36 @@ coreos:
   - name: etcd2.service
     command: start
 
+  - name: nginx.service
+    command: start
+    content: |
+        [Unit]
+        Description=nginx service
+
+        [Service]
+        Restart=always
+        ExecStart=/usr/bin/rkt --volume nc,kind=host,source=/etc/nginx/nginx.conf --mount volume=nc,target=/etc/nginx/nginx.conf --net=host run --insecure-options=image docker://nginx
+
+write_files:
+  - path: "/etc/nginx/nginx.conf"
+    permissions: "0644"
+    owner: "root"
+    content: |
+        events {
+            worker_connections  1024;
+        }
+
+        stream {
+            upstream apiservers {
+                server 172.17.4.101:443;
+                server 172.17.4.201:443;
+                server 172.17.4.202:443;
+            }
+
+            server {
+                listen 443;
+                proxy_connect_timeout 1s;
+                proxy_timeout 1s;
+                proxy_pass apiservers;
+            }
+        }
