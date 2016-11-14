@@ -46,7 +46,7 @@ write_files:
             server {
                 listen 443;
                 proxy_connect_timeout 1s;
-                proxy_timeout 1s;
+                proxy_timeout 30s;
                 proxy_pass apiservers;
             }
         }

@@ -10,15 +10,15 @@ Vagrant.require_version ">= 1.6.0"
 
 $update_channel = "stable"
 $controller_count = 1
-$controller_vm_memory = 1024
+$controller_vm_memory = 2048
 $worker_count = 2
-$worker_vm_memory = 1024
+$worker_vm_memory = 512
 $etcd_count = 1
 $etcd_vm_memory = 512
 
-if $worker_vm_memory < 1024
-  puts "Workers should have at least 1024 MB of memory"
-end
+#if $worker_vm_memory < 1024
+#  puts "Workers should have at least 1024 MB of memory"
+#end
 
 CONTROLLER_CLUSTER_IP="10.3.0.1"
 ETCD_CLOUD_CONFIG_PATH = File.expand_path("./etcd-cloud-config.yaml")
