@@ -97,7 +97,21 @@ func run(actualPodName, tempPodName, namespace string, checkpoints map[string]st
 	}
 }
 
-func stripNonessentialInfo(p *v1.Pod) {
+func cleanPodMeta(p *v1.Pod) {
+	oldMeta := p.ObjectMeta
+
+	//TODO(aaron): If we want to keep labels of the parent pod, we need to add a new label so the
+	//           checkpointed pod is not thought to be owned by a higher-level object (daemonset/deployment).
+	//           If it is, there are some weird interactions (controller-manager deleting mirror pod, but kubelet recreating it).
+	p.ObjectMeta = v1.ObjectMeta{
+		Name:      oldMeta.Name,
+		Namespace: oldMeta.Namespace,
+	}
+
+	//TODO(aaron): Remove this once we are properly tracking relationship between parent pod and checkpoint,
+	// instead of by a fixed name.
+	p.ObjectMeta.Name = tempAPIServer
+
 	p.Spec.ServiceAccountName = ""
 	p.Spec.DeprecatedServiceAccount = ""
 	p.Status.Reset()
@@ -194,7 +208,7 @@ func createCheckpointPod(podList v1.PodList, n, ns string) v1.Pod {
 	// Add it now.
 	checkpointPod.TypeMeta = podAPIServerMeta
 	cleanVolumes(&checkpointPod)
-	stripNonessentialInfo(&checkpointPod)
+	cleanPodMeta(&checkpointPod)
 	return checkpointPod
 }
 
