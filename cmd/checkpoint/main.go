@@ -20,6 +20,7 @@ import (
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_4"
 	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	clientcmdapi "k8s.io/kubernetes/pkg/client/unversioned/clientcmd/api"
+	"k8s.io/kubernetes/pkg/util/wait"
 )
 
 const (
@@ -147,10 +148,15 @@ func bothRunning(pods v1.PodList, an, tn, ns string) bool {
 func isPodRunning(pods v1.PodList, client clientset.Interface, n, ns string) bool {
 	for _, p := range pods.Items {
 		if isPod(p, n, ns) {
+			//TODO(aaron): this is all really hacky - but known will be replaced soon.
+			// This could be incorrect in multi-api scenariios. Should be checking the status based on the liveness probe.
 			if n == kubeAPIServer {
 				// Make sure it's actually running. Sometimes we get that
 				// pod manifest back, but the server is not actually running.
-				_, err := client.Discovery().ServerVersion()
+				err := wait.Poll(time.Second, 10*time.Second, func() (bool, error) {
+					_, err := client.Discovery().ServerVersion()
+					return err != nil, nil
+				})
 				return err == nil
 			}
 			return true
