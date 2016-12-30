@@ -141,6 +141,7 @@ spec:
         - --insecure-port=8080
         - --advertise-address=$(POD_IP)
         - --etcd-servers={{ range $i, $e := .EtcdServers }}{{ if $i }},{{end}}{{ $e }}{{end}}
+        - --etcd-quorum-read=true
         - --storage-backend={{.StorageBackend}}
         - --allow-privileged=true
         - --service-cluster-ip-range=10.3.0.0/24

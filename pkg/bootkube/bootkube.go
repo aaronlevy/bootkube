@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	assetTimeout    = 10 * time.Minute
+	assetTimeout    = 20 * time.Minute
 	insecureAPIAddr = "http://127.0.0.1:8080"
 )
 
@@ -89,6 +89,7 @@ func makeAPIServerFlags(config Config) []string {
 		"--tls-cert-file=" + filepath.Join(config.AssetDir, asset.AssetPathAPIServerCert),
 		"--client-ca-file=" + filepath.Join(config.AssetDir, asset.AssetPathCACert),
 		"--etcd-servers=" + config.EtcdServer.String(),
+		"--etcd-quorum-read=true",
 		"--service-cluster-ip-range=10.3.0.0/24",
 		"--service-account-key-file=" + filepath.Join(config.AssetDir, asset.AssetPathServiceAccountPubKey),
 		"--admission-control=NamespaceLifecycle,ServiceAccount",
