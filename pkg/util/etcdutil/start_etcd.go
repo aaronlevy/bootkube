@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang/glog"
@@ -22,7 +23,8 @@ func waitEtcdUp(endpoint string) error {
 		Timeout: 10 * time.Second,
 	}
 	for {
-		_, err := httpcli.Get(endpoint + "/version")
+		//TODO(aaron): should try more than first endpoint
+		_, err := httpcli.Get(strings.Split(endpoint, ",")[0] + "/version")
 		if err != nil {
 			glog.Infof("couldn't talk to etcd server (retrying 10s later): %v\n", err)
 			time.Sleep(10 * time.Second)

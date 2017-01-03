@@ -9,17 +9,21 @@ import (
 	"github.com/golang/glog"
 	"golang.org/x/net/context"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/errors"
 	"k8s.io/kubernetes/pkg/api/v1"
 	clientset "k8s.io/kubernetes/pkg/client/clientset_generated/release_1_5"
 	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/util/wait"
+
+	"github.com/kubernetes-incubator/bootkube/pkg/util"
 )
 
 const (
 	apiserverAddr = "http://127.0.0.1:8080"
 	etcdServiceIP = "10.3.0.15"
 
-	etcdPivotTimeout = 5 * time.Minute
+	etcdTPRTimeout   = 10 * time.Minute
+	etcdPivotTimeout = 10 * time.Minute
 )
 
 func Migrate() error {
@@ -31,7 +35,8 @@ func Migrate() error {
 	}
 	restClient := kubecli.CoreV1().RESTClient()
 
-	err = waitEtcdTPRReady(restClient, 5*time.Second, 60*time.Second, api.NamespaceSystem)
+	util.UserOutput("Waiting for etcd TPR...\n")
+	err = waitEtcdTPRReady(restClient, 5*time.Second, etcdTPRTimeout, api.NamespaceSystem)
 	if err != nil {
 		return err
 	}
@@ -47,6 +52,7 @@ func Migrate() error {
 		return err
 	}
 
+	util.UserOutput("Waiting for migration to self-hosted etcd cluster...\n")
 	return checkEtcdClusterUp()
 }
 
@@ -59,20 +65,18 @@ func waitEtcdTPRReady(restClient restclient.Interface, interval, timeout time.Du
 	err := wait.Poll(interval, timeout, func() (bool, error) {
 		res := listETCDCluster(ns, restClient)
 		if res.Error() != nil {
+			if errors.IsNotFound(res.Error()) {
+				return false, nil // not set up yet. Wait.
+			}
 			return false, res.Error()
 		}
 
 		var status int
 		res.StatusCode(&status)
-
-		switch status {
-		case http.StatusOK:
+		if status == http.StatusOK {
 			return true, nil
-		case http.StatusNotFound: // not set up yet. wait.
-			return false, nil
-		default:
-			return false, fmt.Errorf("invalid status code: %v", status)
 		}
+		return false, fmt.Errorf("invalid status code: %v", status)
 	})
 	if err != nil {
 		return fmt.Errorf("fail to wait etcd TPR to be ready: %v", err)

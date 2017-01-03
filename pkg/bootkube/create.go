@@ -40,20 +40,20 @@ func CreateAssets(manifestDir string, timeout time.Duration) error {
 					return false, nil // retry
 				}
 			}
-			UserOutput("\nError creating assets: %v\n", err)
-			UserOutput("\nNOTE: Bootkube failed to create some cluster assets. It is important that manifest errors are resolved and resubmitted to the apiserver.\n")
-			UserOutput("For example, after resolving issues: kubectl create -f <failed-manifest>\n\n")
+			util.UserOutput("\nError creating assets: %v\n", err)
+			util.UserOutput("\nNOTE: Bootkube failed to create some cluster assets. It is important that manifest errors are resolved and resubmitted to the apiserver.\n")
+			util.UserOutput("For example, after resolving issues: kubectl create -f <failed-manifest>\n\n")
 		}
 		return true, nil
 	}
 
-	UserOutput("Waiting for api-server...\n")
+	util.UserOutput("Waiting for api-server...\n")
 	start := time.Now()
 	if err := wait.Poll(5*time.Second, timeout, upFn); err != nil {
 		return fmt.Errorf("API Server unavailable: %v", err)
 	}
 
-	UserOutput("Creating self-hosted assets...\n")
+	util.UserOutput("Creating self-hosted assets...\n")
 	timeout = timeout - time.Since(start)
 	if err := wait.Poll(5*time.Second, timeout, createFn); err != nil {
 		return fmt.Errorf("Failed to create assets: %v", err)
@@ -120,7 +120,7 @@ func createAssets(manifestDir string) error {
 			f.PrintObjectSpecificMessage(info.Object, util.GlogWriter{})
 		}
 		cmdutil.PrintSuccess(mapper, shortOutput, util.GlogWriter{}, info.Mapping.Resource, info.Name, false, "created")
-		UserOutput("\tcreated %23s %s\n", info.Name, strings.TrimSuffix(info.Mapping.Resource, "s"))
+		util.UserOutput("\tcreated %23s %s\n", info.Name, strings.TrimSuffix(info.Mapping.Resource, "s"))
 		return nil
 	})
 	if err != nil {

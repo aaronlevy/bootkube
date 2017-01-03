@@ -1,7 +1,6 @@
 package bootkube
 
 import (
-	"fmt"
 	"net/url"
 	"path/filepath"
 	"time"
@@ -15,10 +14,11 @@ import (
 	scheduler "k8s.io/kubernetes/plugin/cmd/kube-scheduler/app/options"
 
 	"github.com/kubernetes-incubator/bootkube/pkg/asset"
+	"github.com/kubernetes-incubator/bootkube/pkg/util"
 )
 
 const (
-	assetTimeout    = 20 * time.Minute
+	assetTimeout    = 30 * time.Minute
 	insecureAPIAddr = "http://127.0.0.1:8080"
 )
 
@@ -102,7 +102,7 @@ func makeAPIServerFlags(config Config) []string {
 }
 
 func (b *bootkube) Run() error {
-	UserOutput("Running temporary bootstrap control plane...\n")
+	util.UserOutput("Running temporary bootstrap control plane...\n")
 
 	errch := make(chan error)
 	go func() { errch <- apiapp.Run(b.apiServer) }()
@@ -118,15 +118,7 @@ func (b *bootkube) Run() error {
 	// If any of the bootkube services exit, it means it is unrecoverable and we should exit.
 	err := <-errch
 	if err != nil {
-		UserOutput("Error: %v\n", err)
+		util.UserOutput("Error: %v\n", err)
 	}
 	return err
-}
-
-// All bootkube printing to stdout should go through this fmt.Printf wrapper.
-// The stdout of bootkube should convey information useful to a human sitting
-// at a terminal watching their cluster bootstrap itself. Otherwise the message
-// should go to stderr.
-func UserOutput(format string, a ...interface{}) {
-	fmt.Printf(format, a...)
 }

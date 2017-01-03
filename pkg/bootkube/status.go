@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/golang/glog"
+	"github.com/kubernetes-incubator/bootkube/pkg/util"
 	"github.com/kubernetes-incubator/bootkube/pkg/util/etcdutil"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/v1"
@@ -42,7 +43,7 @@ func WaitUntilPodsRunning(pods []string, timeout time.Duration, selfHostedEtcd b
 		}
 	}
 
-	UserOutput("All self-hosted control plane components successfully started\n")
+	util.UserOutput("All self-hosted control plane components successfully started\n")
 	return nil
 }
 
@@ -104,7 +105,7 @@ func (s *statusController) AllRunning() (bool, error) {
 	running := true
 	for p, s := range ps {
 		if changed {
-			UserOutput("\tPod Status:%24s\t%s\n", p, s)
+			util.UserOutput("\tPod Status:%24s\t%s\n", p, s)
 		}
 		if s != v1.PodRunning {
 			running = false
