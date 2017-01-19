@@ -31,7 +31,7 @@ BOOTKUBE_REPO=${BOOTKUBE_REPO:-}
 BOOTKUBE_VERSION=${BOOTKUBE_VERSION:-}
 COREOS_CHANNEL=${COREOS_CHANNEL:-'coreos-stable'}
 WORKER_COUNT=4
-GCE_PREFIX=${GCE_PREFIX:-'bootkube-ci'}
+GCE_PREFIX=${GCE_PREFIX:-'bootkube-conformance'}
 
 function cleanup {
     gcloud compute instances delete --quiet --zone us-central1-a ${GCE_PREFIX}-m1 || true
@@ -84,6 +84,12 @@ function add_workers {
         cd /build/bootkube/hack/quickstart && SSH_OPTS="-o StrictHostKeyChecking=no" ./init-worker.sh ${WORKER_IP} /build/cluster/auth/kubeconfig
     done
 }
+
+CLEANUP=${CLEANUP:-false}
+if [ "${CLEANUP}" == true ]; then
+    cleanup
+    exit 0
+fi
 
 IN_CONTAINER=${IN_CONTAINER:-false}
 if [ "${IN_CONTAINER}" == true ]; then
