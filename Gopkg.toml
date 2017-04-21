@@ -1,0 +1,32 @@
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/coreos/etcd"
+
+[[dependencies]]
+  branch = "master"
+  name = "github.com/coreos/etcd-operator"
+
+[[dependencies]]
+  name = "github.com/ghodss/yaml"
+  revision = "73d445a93680fa1a78ae23a5839bad48f32ba1ee"
+
+[[dependencies]]
+  name = "github.com/golang/glog"
+  revision = "44145f04b68cf362d9c4df2182967c2275eaefed"
+
+[[dependencies]]
+  name = "github.com/spf13/cobra"
+  revision = "1c44ec8d3f1552cac48999f9306da23c4d8a288b"
+
+[[dependencies]]
+  name = "k8s.io/apimachinery"
+  revision = "75b8dd260ef0469d96d578705a87cffd0e09dab8"
+
+[[dependencies]]
+  name = "k8s.io/client-go"
+  version = "^3.0.0-beta.0"
+
+[[dependencies]]
+  name = "k8s.io/kubernetes"
+  version = "^1.5.6"
